@@ -1,41 +1,57 @@
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+// HTTP Client for downstream services
+builder.Services.AddHttpClient();
+
+// CORS for React frontend
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowReact", builder =>
+    {
+        builder.AllowAnyOrigin()
+            .AllowAnyMethod()
+            .AllowAnyHeader();
+    });
+});
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
-
 app.UseHttpsRedirection();
+app.UseCors("AllowReact");
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+// Gateway health check
+app.MapGet("/health", () => "Gateway is healthy").WithName("Health").WithOpenApi();
 
-app.MapGet("/weatherforecast", () =>
+// Forward products requests to CatalogService
+app.MapGet("/api/products", async (HttpClient client) =>
 {
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
+    var response = await client.GetAsync("https://localhost:5198/api/products");
+    var content = await response.Content.ReadAsStringAsync();
+    return Results.Text(content, contentType: "application/json", statusCode: (int)response.StatusCode);
+}).WithName("Get Products").WithOpenApi();
+
+app.MapPost("/api/products", async (HttpClient client, HttpRequest request) =>
+{
+    var body = new StreamContent(request.Body);
+    var response = await client.PostAsync("https://localhost:5198/api/products", body);
+    var content = await response.Content.ReadAsStringAsync();
+    return Results.Text(content, contentType: "application/json", statusCode: (int)response.StatusCode);
+}).WithName("Create Product").WithOpenApi();
+
+// Forward orders requests to OrdersService
+app.MapGet("/api/orders", async (HttpClient client) =>
+{
+    var response = await client.GetAsync("https://localhost:5210/api/orders");
+    var content = await response.Content.ReadAsStringAsync();
+    return Results.Text(content, contentType: "application/json", statusCode: (int)response.StatusCode);
+}).WithName("Get Orders").WithOpenApi();
+
+app.MapPost("/api/orders", async (HttpClient client, HttpRequest request) =>
+{
+    var body = new StreamContent(request.Body);
+    var response = await client.PostAsync("https://localhost:5210/api/orders", body);
+    var content = await response.Content.ReadAsStringAsync();
+    return Results.Text(content, contentType: "application/json", statusCode: (int)response.StatusCode);
+}).WithName("Create Order").WithOpenApi();
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
