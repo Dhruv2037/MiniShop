@@ -45,7 +45,8 @@ export const createOrder = createAsyncThunk(
     try {
       return await orderAPI.create(items);
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to create order');
+      const payload = error.response?.data ?? error.message ?? 'Failed to create order';
+      return rejectWithValue(payload);
     }
   }
 );
@@ -86,6 +87,17 @@ const orderSlice = createSlice({
         existingItem.quantity += action.payload.quantity;
       } else {
         state.cart.push(action.payload);
+      }
+    },
+    decreaseFromCart: (state, action) => {
+      const existingItem = state.cart.find(
+        (item) => item.productId === action.payload.productId
+      );
+      if (existingItem) {
+        existingItem.quantity -= action.payload.quantity;
+        if (existingItem.quantity <= 0) {
+          state.cart = state.cart.filter((i) => i.productId !== action.payload.productId);
+        }
       }
     },
     removeFromCart: (state, action) => {
@@ -167,5 +179,5 @@ const orderSlice = createSlice({
   },
 });
 
-export const { addToCart, removeFromCart, clearCart, clearError } = orderSlice.actions;
+export const { addToCart, decreaseFromCart, removeFromCart, clearCart, clearError } = orderSlice.actions;
 export default orderSlice.reducer;

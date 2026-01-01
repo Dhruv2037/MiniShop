@@ -28,6 +28,25 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// Ensure database and tables exist BEFORE handling requests
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<OrdersDbContext>();
+    try
+    {
+        // First ensure database exists
+        db.Database.EnsureCreated();
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger.LogInformation("Orders database and tables ensured.");
+    }
+    catch (Exception ex)
+    {
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Failed to ensure Orders database: {Message}", ex.Message);
+        throw; // Fail startup if DB init fails
+    }
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

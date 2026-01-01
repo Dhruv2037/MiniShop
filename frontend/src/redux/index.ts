@@ -11,6 +11,7 @@ export {
 	deleteOrder,
 	addToCart,
 	removeFromCart,
+	decreaseFromCart,
 	clearCart,
 	clearError as clearOrderError,
 } from './orderSlice';
