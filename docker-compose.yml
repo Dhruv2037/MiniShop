@@ -1,0 +1,132 @@
+version: '3.9'
+
+services:
+  # SQL Server Database
+  sql-server:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    container_name: minishop-sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      SA_PASSWORD: "YourPassword@123"
+    ports:
+      - "1433:1433"
+    volumes:
+      - mssql-data:/var/opt/mssql
+    healthcheck:
+      test: /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P YourPassword@123 -Q "SELECT 1"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - minishop-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: minishop-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - minishop-network
+
+  # RabbitMQ Message Queue
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: minishop-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - minishop-network
+
+  # Elasticsearch (Optional, for production search)
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.5.0
+    container_name: minishop-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+    ports:
+      - "9200:9200"
+    healthcheck:
+      test: curl -s http://localhost:9200 >/dev/null || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - minishop-network
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.ApiGateway
+    container_name: minishop-api-gateway
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:7000
+      ConnectionStrings__CatalogDb: "Server=sql-server;Database=MiniShop_Catalog;User Id=sa;Password=YourPassword@123;TrustServerCertificate=True;"
+      ConnectionStrings__OrdersDb: "Server=sql-server;Database=MiniShop_Orders;User Id=sa;Password=YourPassword@123;TrustServerCertificate=True;"
+    ports:
+      - "7000:7000"
+    depends_on:
+      sql-server:
+        condition: service_healthy
+    networks:
+      - minishop-network
+
+  # Catalog Service
+  catalog-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.CatalogService
+    container_name: minishop-catalog
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:7001
+      ConnectionStrings__CatalogDb: "Server=sql-server;Database=MiniShop_Catalog;User Id=sa;Password=YourPassword@123;TrustServerCertificate=True;"
+    ports:
+      - "7001:7001"
+    depends_on:
+      sql-server:
+        condition: service_healthy
+    networks:
+      - minishop-network
+
+  # Orders Service
+  orders-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.OrdersService
+    container_name: minishop-orders
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:7002
+      ConnectionStrings__OrdersDb: "Server=sql-server;Database=MiniShop_Orders;User Id=sa;Password=YourPassword@123;TrustServerCertificate=True;"
+    ports:
+      - "7002:7002"
+    depends_on:
+      sql-server:
+        condition: service_healthy
+    networks:
+      - minishop-network
+
+volumes:
+  mssql-data:
+
+networks:
+  minishop-network:
+    driver: bridge

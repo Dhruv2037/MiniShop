@@ -21,6 +21,17 @@ builder.Services.AddCors(options =>
     });
 });
 
+// Read downstream service base URLs from configuration or environment variables.
+// In Docker Compose the services are reachable by container name; when running
+// locally you may want to use localhost. Environment variables take precedence.
+var catalogBaseUrl = builder.Configuration["CatalogService:BaseUrl"]
+                     ?? Environment.GetEnvironmentVariable("CATALOG_SERVICE_URL")
+                     ?? "http://localhost:7001";
+
+var ordersBaseUrl = builder.Configuration["OrdersService:BaseUrl"]
+                    ?? Environment.GetEnvironmentVariable("ORDERS_SERVICE_URL")
+                    ?? "http://localhost:7002";
+
 var app = builder.Build();
 
 // app.UseHttpsRedirection(); // Disabled for dev - no HTTPS port configured in HTTP profile
@@ -30,7 +41,7 @@ app.UseCors("AllowReact");
 app.MapGet("/health", () => "Gateway is healthy").WithName("Health").WithOpenApi();
 
 // ============================================
-// PRODUCTS ENDPOINTS (Forward to CatalogService:7001)
+// PRODUCTS ENDPOINTS (Forward to CatalogService)
 // ============================================
 
 // GET /api/products - Get all products
@@ -38,7 +49,7 @@ app.MapGet("/api/products", async (HttpClient client) =>
 {
     try
     {
-        var response = await client.GetAsync("http://localhost:7001/api/products");
+        var response = await client.GetAsync($"{catalogBaseUrl}/api/products");
         var content = await response.Content.ReadAsStringAsync();
         return Results.Text(content, contentType: "application/json", statusCode: (int)response.StatusCode);
     }
@@ -53,7 +64,7 @@ app.MapGet("/api/products/{id}", async (int id, HttpClient client) =>
 {
     try
     {
-        var response = await client.GetAsync($"http://localhost:7001/api/products/{id}");
+        var response = await client.GetAsync($"{catalogBaseUrl}/api/products/{id}");
         var content = await response.Content.ReadAsStringAsync();
         return Results.Text(content, contentType: "application/json", statusCode: (int)response.StatusCode);
     }
@@ -72,7 +83,7 @@ app.MapPost("/api/products", async (HttpClient client, HttpRequest request) =>
         var bodyString = await reader.ReadToEndAsync();
         var ct = request.ContentType ?? "application/json";
         var contentMsg = new StringContent(bodyString, System.Text.Encoding.UTF8, ct);
-        var response = await client.PostAsync("http://localhost:7001/api/products", contentMsg);
+        var response = await client.PostAsync($"{catalogBaseUrl}/api/products", contentMsg);
         var content = await response.Content.ReadAsStringAsync();
         return Results.Text(content, contentType: "application/json", statusCode: (int)response.StatusCode);
     }
@@ -91,7 +102,7 @@ app.MapPut("/api/products/{id}", async (int id, HttpClient client, HttpRequest r
         var bodyString = await reader.ReadToEndAsync();
         var ct = request.ContentType ?? "application/json";
         var contentMsg = new StringContent(bodyString, System.Text.Encoding.UTF8, ct);
-        var response = await client.PutAsync($"http://localhost:7001/api/products/{id}", contentMsg);
+        var response = await client.PutAsync($"{catalogBaseUrl}/api/products/{id}", contentMsg);
         var content = await response.Content.ReadAsStringAsync();
         return Results.Text(content, contentType: "application/json", statusCode: (int)response.StatusCode);
     }
@@ -106,7 +117,7 @@ app.MapDelete("/api/products/{id}", async (int id, HttpClient client) =>
 {
     try
     {
-        var response = await client.DeleteAsync($"http://localhost:7001/api/products/{id}");
+        var response = await client.DeleteAsync($"{catalogBaseUrl}/api/products/{id}");
         var content = await response.Content.ReadAsStringAsync();
         return Results.Text(content, contentType: "application/json", statusCode: (int)response.StatusCode);
     }
@@ -117,7 +128,7 @@ app.MapDelete("/api/products/{id}", async (int id, HttpClient client) =>
 }).WithName("Delete Product").WithOpenApi();
 
 // ============================================
-// ORDERS ENDPOINTS (Forward to OrdersService:7002)
+// ORDERS ENDPOINTS (Forward to OrdersService)
 // ============================================
 
 // GET /api/orders - Get all orders
@@ -125,7 +136,7 @@ app.MapGet("/api/orders", async (HttpClient client) =>
 {
     try
     {
-        var response = await client.GetAsync("http://localhost:7002/api/orders");
+        var response = await client.GetAsync($"{ordersBaseUrl}/api/orders");
         var content = await response.Content.ReadAsStringAsync();
         return Results.Text(content, contentType: "application/json", statusCode: (int)response.StatusCode);
     }
@@ -140,7 +151,7 @@ app.MapGet("/api/orders/{id}", async (int id, HttpClient client) =>
 {
     try
     {
-        var response = await client.GetAsync($"http://localhost:7002/api/orders/{id}");
+        var response = await client.GetAsync($"{ordersBaseUrl}/api/orders/{id}");
         var content = await response.Content.ReadAsStringAsync();
         return Results.Text(content, contentType: "application/json", statusCode: (int)response.StatusCode);
     }
@@ -159,7 +170,7 @@ app.MapPost("/api/orders", async (HttpClient client, HttpRequest request) =>
         var bodyString = await reader.ReadToEndAsync();
         var ct = request.ContentType ?? "application/json";
         var contentMsg = new StringContent(bodyString, System.Text.Encoding.UTF8, ct);
-        var response = await client.PostAsync("http://localhost:7002/api/orders", contentMsg);
+        var response = await client.PostAsync($"{ordersBaseUrl}/api/orders", contentMsg);
         var content = await response.Content.ReadAsStringAsync();
         return Results.Text(content, contentType: "application/json", statusCode: (int)response.StatusCode);
     }
@@ -178,7 +189,7 @@ app.MapPut("/api/orders/{id}/status", async (int id, HttpClient client, HttpRequ
         var bodyString = await reader.ReadToEndAsync();
         var ct = request.ContentType ?? "application/json";
         var contentMsg = new StringContent(bodyString, System.Text.Encoding.UTF8, ct);
-        var response = await client.PutAsync($"http://localhost:7002/api/orders/{id}/status", contentMsg);
+        var response = await client.PutAsync($"{ordersBaseUrl}/api/orders/{id}/status", contentMsg);
         var content = await response.Content.ReadAsStringAsync();
         return Results.Text(content, contentType: "application/json", statusCode: (int)response.StatusCode);
     }
@@ -193,7 +204,7 @@ app.MapDelete("/api/orders/{id}", async (int id, HttpClient client) =>
 {
     try
     {
-        var response = await client.DeleteAsync($"http://localhost:7002/api/orders/{id}");
+        var response = await client.DeleteAsync($"{ordersBaseUrl}/api/orders/{id}");
         var content = await response.Content.ReadAsStringAsync();
         return Results.Text(content, contentType: "application/json", statusCode: (int)response.StatusCode);
     }
