@@ -400,6 +400,26 @@ FodyWeavers.xsd
 *.msm
 *.msp
 
+# --------------------------------------------------
+# Local project docs & demo artifacts (do NOT commit)
+# Add any interview/demo files here that you don't want pushed
+# --------------------------------------------------
+# Interview / demo guides
+/INTERVIEW_GUIDE.md
+/INTERVIEW_QUICK_REFERENCE.md
+/PHASE_1_COMPLETION.md
+/START_HERE.md
+/00_START_HERE.md
+
+# Local scripts used for demo/setup
+/startup.ps1
+/add-products.ps1
+
+# Presentation files
+*.pptx
+*.key
+*.pdf
+
 # JetBrains Rider
 *.sln.iml
 .idea/
